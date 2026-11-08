@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -18,6 +18,8 @@ import type { Column as ColumnType, Task, CreateTaskInput } from "@/types";
 import { Column } from "./Column";
 import { TaskCard } from "./TaskCard";
 import { TaskModal } from "./TaskModal";
+import { SearchFilter } from "./SearchFilter";
+import type { Priority } from "@/types";
 
 export function Board() {
   const [columns, setColumns] = useState<ColumnType[]>(mockColumns);
@@ -25,6 +27,23 @@ export function Board() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [targetColumnId, setTargetColumnId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<Priority | "ALL">("ALL");
+
+  const filteredColumns = useMemo(() => {
+    return columns.map((col) => ({
+      ...col,
+      tasks: col.tasks.filter((task) => {
+        const matchesSearch =
+          !searchQuery ||
+          task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          task.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesPriority =
+          priorityFilter === "ALL" || task.priority === priorityFilter;
+        return matchesSearch && matchesPriority;
+      }),
+    }));
+  }, [columns, searchQuery, priorityFilter]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -155,6 +174,12 @@ export function Board() {
 
   return (
     <>
+      <SearchFilter
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        priorityFilter={priorityFilter}
+        onPriorityChange={setPriorityFilter}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -163,7 +188,7 @@ export function Board() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-6 overflow-x-auto pb-4">
-          {columns.map((column) => (
+          {filteredColumns.map((column) => (
             <Column
               key={column.id}
               column={column}
